@@ -8,6 +8,7 @@
 
 import SpotifyWebAPI
 import UIKit
+import SwiftUI
 import Combine
 
 class ViewController: UIViewController {
@@ -19,7 +20,7 @@ class ViewController: UIViewController {
     
     private var cancellables: Set<AnyCancellable> = []
     
-    private var isAuthed: Bool = false
+    @State private var isAuthed: Bool = false
     private var currentAuthURL: Optional<URL> = Optional.none
     private lazy var connectLabel: UILabel = {
         let label = UILabel()
@@ -61,7 +62,6 @@ class ViewController: UIViewController {
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        updateViewBasedOnConnected()
     }
     
     //MARK: Methods
@@ -77,17 +77,13 @@ class ViewController: UIViewController {
         disconnectButton.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -50).isActive = true
         connectLabel.centerXAnchor.constraint(equalTo: connectButton.centerXAnchor).isActive = true
         connectLabel.bottomAnchor.constraint(equalTo: connectButton.topAnchor, constant: -constant).isActive = true
-        updateViewBasedOnConnected()
-        
-        spotify.setupDebugging()
     }
     
-    func updateViewBasedOnConnected() {
+    override func loadView() {
         if isAuthed {
             connectButton.isHidden = true
             disconnectButton.isHidden = false
             connectLabel.isHidden = true
-            createPlaylistAPICall()
         } else { //show login
             disconnectButton.isHidden = true
             connectButton.isHidden = false
@@ -102,7 +98,7 @@ class ViewController: UIViewController {
     }
     
     func disconnect() {
-        // TODO
+        isAuthed = false;
     }
     
     @objc func didTapConnect(_ button: UIButton) {
@@ -128,8 +124,9 @@ class ViewController: UIViewController {
         .sink(receiveCompletion: { completion in
             switch completion {
             case .finished:
-                print("ok")
                 self.isAuthed = true
+                self.addSongsForEmotion()
+                print("ok")
             case .failure(let error):
                 if let authError = error as? SpotifyAuthorizationError, authError.accessWasDenied {
                     print("denied auth request")
@@ -139,8 +136,8 @@ class ViewController: UIViewController {
             }
         })
         .store(in: &cancellables)
+
     }
-    
     
     // MARK: - Private Helpers
     
@@ -152,8 +149,29 @@ class ViewController: UIViewController {
             self.present(controller, animated: true)
         }
     }
+
+    func addSongsForEmotion() {
+        let mood = "negative"
+        
+        if (mood == "negative") {
+            // create negative mood playlist to validate
+            let validatePlaylist = spotify.createPlaylist(for: "3d709ub6butki35xnrcnhpunl", PlaylistDetails.init(name: "validate"))
+            print(validatePlaylist)
+
+//            let validateSearchResults = spotify.search(query: "sad", categories: [IDCategory.track], limit: 10)
+            
     
-    func createPlaylistAPICall() {
-        spotify.createPlaylist(for: "srihitaramini", PlaylistDetails.init(name: "test"))
+//            var validateURIs = [] as SpotifyURIConvertible
+//            for result in validateSearchResults {
+//                print(result)
+//                trackURIs.append(result.localizedDescription.uri)
+//            }
+            
+            //spotify.addToPlaylist(validatePlaylist.description.uri, uris: validateURIs)
+        
+        } else {
+            
+            
+        }
     }
 }
