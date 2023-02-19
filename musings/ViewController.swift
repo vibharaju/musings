@@ -11,6 +11,12 @@ import UIKit
 import SwiftUI
 import Combine
 
+enum State {
+    case unauthed
+    case loading
+    case authed
+}
+
 class ViewController: UIViewController {
     let spotify = SpotifyAPI(
         authorizationManager: AuthorizationCodeFlowManager(
@@ -20,7 +26,7 @@ class ViewController: UIViewController {
     
     private var cancellables: Set<AnyCancellable> = []
     
-    @State private var isAuthed: Bool = false
+    private var isAuthed: State = .unauthed
     private var currentAuthURL: Optional<URL> = Optional.none
     private lazy var connectLabel: UILabel = {
         let label = UILabel()
@@ -62,6 +68,7 @@ class ViewController: UIViewController {
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        updateViewBasedOnConnected()
     }
     
     //MARK: Methods
@@ -79,26 +86,36 @@ class ViewController: UIViewController {
         connectLabel.bottomAnchor.constraint(equalTo: connectButton.topAnchor, constant: -constant).isActive = true
     }
     
-    override func loadView() {
-        if isAuthed {
-            connectButton.isHidden = true
-            disconnectButton.isHidden = false
-            connectLabel.isHidden = true
-        } else { //show login
-            disconnectButton.isHidden = true
-            connectButton.isHidden = false
-            connectLabel.isHidden = false
+    func updateViewBasedOnConnected() {
+        DispatchQueue.main.async {
+            switch self.isAuthed {
+            case .unauthed:
+                self.disconnectButton.isHidden = true
+                self.connectButton.isHidden = false
+                self.connectLabel.isHidden = false
+                break
+            case .loading:
+                self.disconnectButton.isHidden = false
+                self.connectButton.isHidden = false
+                self.connectLabel.isHidden = false
+                break
+            case .authed:
+                self.connectButton.isHidden = true
+                self.disconnectButton.isHidden = false
+                self.connectLabel.isHidden = true
+                break
+            }
         }
     }
     
     @objc func didTapDisconnect(_ button: UIButton) {
-        if isAuthed {
-            self.disconnect()
-        }
+        print("disconnect pressed")
+        self.disconnect()
     }
     
     func disconnect() {
-        isAuthed = false;
+        self.isAuthed = .unauthed;
+        updateViewBasedOnConnected()
     }
     
     @objc func didTapConnect(_ button: UIButton) {
@@ -115,6 +132,7 @@ class ViewController: UIViewController {
         // show the url to the user
         currentAuthURL = Optional.some(url)
         UIApplication.shared.open(url)
+        self.isAuthed = .loading
     }
     
     public func checkScopes(_ url: URL) {
@@ -124,32 +142,24 @@ class ViewController: UIViewController {
         .sink(receiveCompletion: { completion in
             switch completion {
             case .finished:
-                self.isAuthed = true
+                self.isAuthed = .authed
                 self.addSongsForEmotion()
                 print("ok")
+                self.updateViewBasedOnConnected()
+                break
             case .failure(let error):
                 if let authError = error as? SpotifyAuthorizationError, authError.accessWasDenied {
                     print("denied auth request")
                 } else {
                     print("couldn't auth user: \(error)")
                 }
+                break
             }
         })
         .store(in: &cancellables)
 
     }
     
-    // MARK: - Private Helpers
-    
-    private func presentAlertController(title: String, message: String, buttonTitle: String) {
-        DispatchQueue.main.async {
-            let controller = UIAlertController(title: title, message: message, preferredStyle: .alert)
-            let action = UIAlertAction(title: buttonTitle, style: .default, handler: nil)
-            controller.addAction(action)
-            self.present(controller, animated: true)
-        }
-    }
-
     func addSongsForEmotion() {
         let mood = "negative"
         
