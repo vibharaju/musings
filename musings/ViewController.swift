@@ -114,6 +114,7 @@ class ViewController: UIViewController {
     }
     
     func disconnect() {
+
         self.isAuthed = .unauthed;
         updateViewBasedOnConnected()
     }
@@ -143,7 +144,6 @@ class ViewController: UIViewController {
             switch completion {
             case .finished:
                 self.isAuthed = .authed
-                self.addSongsForEmotion()
                 print("ok")
                 self.updateViewBasedOnConnected()
                 break
@@ -157,31 +157,77 @@ class ViewController: UIViewController {
             }
         })
         .store(in: &cancellables)
-
     }
     
-    func addSongsForEmotion() {
-        let mood = "negative"
-        
-        if (mood == "negative") {
-            // create negative mood playlist to validate
-            let validatePlaylist = spotify.createPlaylist(for: "3d709ub6butki35xnrcnhpunl", PlaylistDetails.init(name: "validate"))
-            print(validatePlaylist)
+    func createSadPlaylist() {
+        // Set up the API endpoint URL
+        let apiUrl = "https://api.spotify.com/v1/recommendations?seed_genres=sad&limit=50"
 
-//            let validateSearchResults = spotify.search(query: "sad", categories: [IDCategory.track], limit: 10)
-            
-    
-//            var validateURIs = [] as SpotifyURIConvertible
-//            for result in validateSearchResults {
-//                print(result)
-//                trackURIs.append(result.localizedDescription.uri)
-//            }
-            
-            //spotify.addToPlaylist(validatePlaylist.description.uri, uris: validateURIs)
-        
-        } else {
-            
-            
+        // Create a URL object from the API endpoint URL
+        guard let url = URL(string: apiUrl) else {
+            print("Error: invalid URL")
+            return
         }
+
+        // Create a URL request with the necessary headers
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.addValue("Bearer YOUR_ACCESS_TOKEN", forHTTPHeaderField: "Authorization")
+
+        // Send the API request using URLSession
+        let session = URLSession.shared
+        let task = session.dataTask(with: request) { (data, response, error) in
+            if let error = error {
+                print("Error: \(error.localizedDescription)")
+                return
+            }
+
+            // Parse the response data into a JSON object
+            if let data = data,
+               let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
+               let tracks = json["tracks"] as? [[String: Any]] {
+
+                // Extract the track URIs from the JSON object
+                let trackURIs = tracks.compactMap { $0["uri"] as? String }
+
+                // Create a new playlist with the extracted track URIs
+                let playlistUrl = "https://api.spotify.com/v1/users/USER_ID/playlists"
+                guard let playlistRequestUrl = URL(string: playlistUrl) else {
+                    print("Error: invalid URL")
+                    return
+                }
+
+                var playlistRequest = URLRequest(url: playlistRequestUrl)
+                playlistRequest.httpMethod = "POST"
+                playlistRequest.addValue("Bearer YOUR_ACCESS_TOKEN", forHTTPHeaderField: "Authorization")
+                playlistRequest.addValue("application/json", forHTTPHeaderField: "Content-Type")
+
+                let playlistData = ["name": "Sad Playlist",
+                                    "public": false,
+                                    "description": "A playlist of sad songs",
+                                    "uris": trackURIs] as [String : Any]
+
+                do {
+                    let jsonData = try JSONSerialization.data(withJSONObject: playlistData, options: [])
+                    playlistRequest.httpBody = jsonData
+                } catch {
+                    print("Error: \(error.localizedDescription)")
+                    return
+                }
+
+                let playlistTask = session.dataTask(with: playlistRequest) { (data, response, error) in
+                    if let error = error {
+                        print("Error: \(error.localizedDescription)")
+                        return
+                    }
+
+                    print("Sad playlist created successfully.")
+                }
+
+                playlistTask.resume()
+            }
+        }
+
+        task.resume()
     }
 }
